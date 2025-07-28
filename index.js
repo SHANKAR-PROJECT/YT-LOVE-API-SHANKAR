@@ -1,5 +1,7 @@
 const axios = require('axios');
 const qs = require('qs');
+const express = require('express');
+const app = express();
 
 const formatDuration = (seconds) => {
   const mins = Math.floor(seconds / 60);
@@ -23,11 +25,32 @@ const getVideoData = async (videoUrl) => {
     "User-Agent": "Mozilla/5.0"
   };
 
-  const response = await axios.post("https://iloveyt.net/proxy.php", qs.stringify(data), { headers });
+  const response = await axios.post(
+    "https://iloveyt.net/proxy.php",
+    qs.stringify(data),
+    { headers }
+  );
   return response.data;
 };
 
-module.exports = async (req, res) => {
+const fetchRealDownloadUrl = async (mediaUrl) => {
+  if (mediaUrl.includes("googlevideo.com")) return null;
+  try {
+    const response = await axios.get(mediaUrl);
+    if (response.data?.fileUrl) {
+      return response.data.fileUrl;
+    }
+    return mediaUrl;
+  } catch {
+    return null;
+  }
+};
+
+app.get("/", (req, res) => {
+  res.send("✅ YouTube Downloader API using iloveyt.net - by Smart Shankar");
+});
+
+app.get("/api", async (req, res) => {
   const { url, type = 'mp4' } = req.query;
   if (!url) return res.status(400).json({ status: "error", message: "Missing YouTube URL" });
 
@@ -41,36 +64,42 @@ module.exports = async (req, res) => {
       throw new Error('Failed to process YouTube video');
     }
 
-    const mediaItems = (videoData.api.mediaItems || []).filter(item =>
-      (type === 'mp3' ? item.type === 'audio' : item.type === 'video') &&
-      !item.mediaUrl.includes("googlevideo.com")
+    const mediaItems = videoData.api.mediaItems || [];
+    const filteredItems = mediaItems.filter(item =>
+      type === 'mp3' ? item.type === 'audio' : item.type === 'video'
     );
 
-    const formattedItems = mediaItems.map(item => ({
-      type: item.type,
-      quality: item.mediaQuality,
-      url: item.mediaUrl,
-      resolution: item.mediaRes,
-      duration: formatDuration(item.mediaDuration),
-      extension: item.mediaExtension,
-      size: item.mediaFileSize
-    }));
+    const downloadItems = [];
+    for (const item of filteredItems) {
+      const realUrl = await fetchRealDownloadUrl(item.mediaUrl);
+      if (realUrl) {
+        downloadItems.push({
+          type: item.type,
+          quality: item.mediaQuality,
+          url: realUrl,
+          resolution: item.mediaRes,
+          duration: formatDuration(item.mediaDuration),
+          extension: item.mediaExtension,
+          size: item.mediaFileSize
+        });
+      }
+    }
 
-    return res.status(200).json({
+    return res.json({
       status: "success",
       code: 200,
-      message: `YouTube ${type.toUpperCase()} data retrieved successfully`,
+      message: `YouTube ${type.toUpperCase()} download links fetched`,
       data: {
         video_info: {
           id: videoId,
           title: videoData.api.title || "No title",
-          description: videoData.api.description || "No description",
+          description: videoData.api.description || "",
           original_url: url,
           previewUrl: videoData.api.previewUrl || "",
           imagePreviewUrl: videoData.api.imagePreviewUrl || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
           permanentLink: `https://youtu.be/${videoId}`,
-          duration: mediaItems[0]?.mediaDuration || 0,
-          duration_formatted: formatDuration(mediaItems[0]?.mediaDuration || 0)
+          duration: filteredItems[0]?.mediaDuration || 0,
+          duration_formatted: formatDuration(filteredItems[0]?.mediaDuration || 0)
         },
         statistics: {
           views: formatCount(videoData.api.mediaStats?.viewsCount),
@@ -78,8 +107,8 @@ module.exports = async (req, res) => {
           comments: formatCount(videoData.api.mediaStats?.commentsCount)
         },
         download_links: {
-          status: true,
-          items: formattedItems
+          count: downloadItems.length,
+          items: downloadItems
         }
       },
       meta: {
@@ -89,12 +118,16 @@ module.exports = async (req, res) => {
         service: "iloveyt.net"
       }
     });
-  } catch (error) {
+  } catch (err) {
     return res.status(500).json({
       status: "error",
-      code: 500,
-      message: error.message,
+      message: err.message,
       data: null
     });
   }
-};
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
