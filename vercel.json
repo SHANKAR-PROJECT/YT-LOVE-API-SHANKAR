@@ -8,7 +8,7 @@
   ],
   "routes": [
     {
-      "src": "/api/download",
+      "src": "/(.*)",
       "dest": "index.js"
     }
   ]
