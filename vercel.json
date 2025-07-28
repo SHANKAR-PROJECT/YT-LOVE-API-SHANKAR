@@ -8,7 +8,7 @@
   ],
   "routes": [
     {
-      "src": "/api/youtube",
+      "src": "/api/youtube.js",
       "dest": "api/youtube.js"
     }
   ]
