@@ -3,8 +3,14 @@ const axios = require("axios");
 const app = express();
 
 app.get("/api", async (req, res) => {
-  const { url, type } = req.query;
+  let { url, type } = req.query;
   if (!url || !type) return res.status(400).json({ error: "Missing url or type" });
+
+  // ✅ Convert shorts to normal watch format
+  if (url.includes("youtube.com/shorts/")) {
+    const id = url.split("/shorts/")[1].split("?")[0];
+    url = `https://www.youtube.com/watch?v=${id}`;
+  }
 
   try {
     const fetch = await axios.get(`https://iloveyt.net/api/ajax/search?query=${encodeURIComponent(url)}`, {
