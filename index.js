@@ -6,49 +6,55 @@ app.get("/api", async (req, res) => {
   let { url, type } = req.query;
   if (!url || !type) return res.status(400).json({ error: "Missing url or type" });
 
-  // ✅ Convert shorts to normal watch format
+  // ✅ Convert shorts link
   if (url.includes("youtube.com/shorts/")) {
     const id = url.split("/shorts/")[1].split("?")[0];
     url = `https://www.youtube.com/watch?v=${id}`;
   }
 
   try {
-    const fetch = await axios.get(`https://iloveyt.net/api/ajax/search?query=${encodeURIComponent(url)}`, {
-      headers: {
-        "x-requested-with": "XMLHttpRequest",
-        Referer: "https://iloveyt.net/en/youtube-to-mp3",
-        "User-Agent": "Mozilla/5.0"
+    const response = await axios.get(
+      `https://iloveyt.net/api/ajax/search?query=${encodeURIComponent(url)}`,
+      {
+        headers: {
+          "x-requested-with": "XMLHttpRequest",
+          "user-agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+          referer: "https://iloveyt.net/en/youtube-to-mp3",
+        },
       }
-    });
-
-    const data = fetch.data;
-    const video = data.data || {};
-    const links = (video.download_links && video.download_links.items) || [];
-
-    if (!links.length) return res.status(404).json({ error: "Download links not available" });
-
-    const filtered = links.filter(x =>
-      x.url && !x.url.includes("googlevideo.com") &&
-      x.type === type.toLowerCase()
     );
 
-    if (!filtered.length) return res.status(404).json({ error: "Clean MP3/MP4 download link not found" });
+    const json = response.data?.data;
+    if (!json) return res.status(500).json({ error: "Invalid response from iloveyt.net" });
 
-    const best = filtered[0];
+    const links = json.download_links?.items || [];
 
-    res.json({
+    const cleanLinks = links.filter(
+      (x) => x.url && !x.url.includes("googlevideo.com") && x.type === type.toLowerCase()
+    );
+
+    if (!cleanLinks.length) {
+      return res.status(404).json({ error: "Clean MP3/MP4 link not found" });
+    }
+
+    const best = cleanLinks[0];
+
+    return res.json({
       status: "success",
-      title: video.video_info?.title,
-      thumbnail: video.video_info?.imagePreviewUrl,
+      title: json.video_info.title,
+      thumbnail: json.video_info.imagePreviewUrl,
       link: best.url,
-      quality: best.quality || "unknown",
-      format: best.format || type,
-      size: best.filesize || "unknown"
+      quality: best.quality,
+      format: best.format,
+      filesize: best.filesize,
     });
-
   } catch (e) {
-    res.status(500).json({ error: "Something went wrong", details: e.message });
+    return res.status(500).json({
+      error: "Something went wrong",
+      details: e.response?.data || e.message,
+    });
   }
 });
 
-app.listen(3000, () => console.log("✅ Server running on port 3000"));
+app.listen(3000, () => console.log("✅ Running"));
