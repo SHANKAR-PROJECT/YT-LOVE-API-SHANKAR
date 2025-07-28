@@ -1,13 +1,10 @@
 {
-  "name": "yt-downloader",
+  "name": "yt-love-api",
   "version": "1.0.0",
-  "description": "YouTube MP3/MP4 downloader using iloveyt.net",
-  "main": "api/youtube.js",
-  "type": "module",
-  "scripts": {
-    "start": "vercel dev"
-  },
+  "main": "index.js",
+  "type": "commonjs",
   "dependencies": {
-    "axios": "^1.6.8"
+    "axios": "^1.6.0",
+    "qs": "^6.11.0"
   }
 }
