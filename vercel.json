@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/youtube.js",
+      "src": "index.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/youtube.js",
-      "dest": "api/youtube.js"
+      "src": "/api/download",
+      "dest": "index.js"
     }
   ]
 }
